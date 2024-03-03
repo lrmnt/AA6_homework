@@ -1,0 +1,36 @@
+### Create roles 1
+POST localhost:8091/roles?name=user
+### 2
+POST localhost:8091/roles?name=admin
+### List roles
+GET localhost:8091/roles
+
+### Create users 1
+POST localhost:8091/users?role=1&name=popug1
+### 2
+POST localhost:8091/users?role=1&name=popug2
+### 3
+POST localhost:8091/users?role=2&name=popug3
+### List users
+GET localhost:8091/users
+
+### login as user
+POST localhost:8091/login?user=popug1
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicHVibGljX2lkIjoiMDE4ZTA0OTAtYzEyYS03MmIxLWIxMmEtMzhlZWE0OTliODRiIiwibmFtZSI6InBvcHVnMSIsInJvbGUiOiJ1c2VyIn0.CLAjWvTg8Qr99JkbFfX0ZrfSGyfahZRPVs5r7aK8LH8
+
+### login as admin
+POST localhost:8091/login?user=popug3
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywicHVibGljX2lkIjoiMDE4ZTA0OTQtYzVjYi03NDg0LThlM2ItYWQzNzYwMWZlY2U3IiwibmFtZSI6InBvcHVnMyIsInJvbGUiOiJhZG1pbiJ9.si5Kz4Co59xRICxwKJwnzQIy7qmwB9OkXK0iuWE21HQ
+
+### Create task 1
+POST localhost:8092/tasks?title=task1&description=descr
+Authorization: BEARER eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicHVibGljX2lkIjoiMDE4ZTA0OTAtYzEyYS03MmIxLWIxMmEtMzhlZWE0OTliODRiIiwibmFtZSI6InBvcHVnMSIsInJvbGUiOiJ1c2VyIn0.CLAjWvTg8Qr99JkbFfX0ZrfSGyfahZRPVs5r7aK8LH8
+
+### Make task done
+POST localhost:8092/tasks/1?status=done
+Authorization: BEARER eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicHVibGljX2lkIjoiMDE4ZTA0OTAtYzEyYS03MmIxLWIxMmEtMzhlZWE0OTliODRiIiwibmFtZSI6InBvcHVnMSIsInJvbGUiOiJ1c2VyIn0.CLAjWvTg8Qr99JkbFfX0ZrfSGyfahZRPVs5r7aK8LH8
+
+### Reassign tasks
+POST localhost:8092/reassign
+Authorization: BEARER eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywicHVibGljX2lkIjoiMDE4ZTA0OTQtYzVjYi03NDg0LThlM2ItYWQzNzYwMWZlY2U3IiwibmFtZSI6InBvcHVnMyIsInJvbGUiOiJhZG1pbiJ9.si5Kz4Co59xRICxwKJwnzQIy7qmwB9OkXK0iuWE21HQ
+
