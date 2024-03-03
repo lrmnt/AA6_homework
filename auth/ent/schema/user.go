@@ -24,13 +24,6 @@ func (User) Fields() []ent.Field {
 	}
 }
 
-//func (User) Annotations() []schema.Annotation {
-//	return []schema.Annotation{
-//		// Do not generate an endpoint for DELETE /users/{id}
-//		entoas.DeleteOperation(entoas.OperationPolicy(entoas.PolicyExclude)),
-//	}
-//}
-
 // Edges of the User.
 func (User) Edges() []ent.Edge {
 	return []ent.Edge{
