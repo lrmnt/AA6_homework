@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	_ "github.com/lib/pq"
+	"github.com/lrmnt/AA6_homework/lib/kafka"
 	"github.com/lrmnt/AA6_homework/tasks/ent"
-	"github.com/lrmnt/AA6_homework/tasks/internal/kafka/consumer"
-	"github.com/lrmnt/AA6_homework/tasks/internal/kafka/producer"
 	"github.com/lrmnt/AA6_homework/tasks/internal/server"
-	"github.com/lrmnt/AA6_homework/tasks/internal/service"
+	"github.com/lrmnt/AA6_homework/tasks/internal/service/consumer"
+	"github.com/lrmnt/AA6_homework/tasks/internal/service/tasks"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"log"
@@ -37,15 +37,17 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tasksProducer, err := producer.New(ctx, "localhost:9092", "tasks")
+	tasksProducer, err := kafka.NewProducer(ctx, "localhost:9092", "tasks")
 	if err != nil {
 		l.Fatal("can not init kafka producer", zap.Error(err))
 	}
 
-	srv := server.New(client, "http://localhost:8091", ":8092", l, tasksProducer)
+	service := tasks.New(l, client, tasksProducer)
 
-	userConsumer := consumer.NewReader([]string{"localhost:9092"}, "users")
-	loader := service.New(l, client, userConsumer)
+	srv := server.New("http://localhost:8091", ":8092", l, service)
+
+	userConsumer := kafka.NewReader([]string{"localhost:9092"}, "users")
+	loader := consumer.New(l, client, userConsumer)
 
 	eg, ctx := errgroup.WithContext(ctx)
 

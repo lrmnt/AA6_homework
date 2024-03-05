@@ -1,16 +1,14 @@
 package server
 
 import (
-	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/lrmnt/AA6_homework/auth/ent/user"
-	"github.com/lrmnt/AA6_homework/auth/pkg/model"
+	"github.com/lrmnt/AA6_homework/lib/auth"
 	"net/http"
 )
 
 type claims struct {
 	jwt.RegisteredClaims
-	model.UserInfo
+	auth.UserInfo
 }
 
 func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +33,7 @@ func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.respondJSON(w, cl.UserInfo)
+	s.s.RespondJSON(w, cl.UserInfo)
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
@@ -51,10 +49,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := s.client.User.Query().
-		Where(user.Name(name)).
-		WithRole().
-		Only(r.Context())
+	u, err := s.service.GetUserByName(r.Context(), name)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -62,7 +57,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &claims{
 		RegisteredClaims: jwt.RegisteredClaims{},
-		UserInfo: model.UserInfo{
+		UserInfo: auth.UserInfo{
 			ID:       u.ID,
 			PublicID: u.UUID,
 			Name:     u.Name,
@@ -72,7 +67,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, err := token.SignedString([]byte(s.jwtSecret))
 	if err != nil {
-		s.responseError(w, http.StatusUnauthorized, fmt.Errorf("can not sign token: %w", err))
+		s.s.Respond401(w, "can not sign token", err)
 		return
 	}
 

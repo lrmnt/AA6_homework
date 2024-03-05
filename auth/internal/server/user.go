@@ -1,162 +1,80 @@
 package server
 
 import (
-	"fmt"
 	"github.com/go-chi/chi/v5"
-	"github.com/golang/protobuf/proto"
-	"github.com/google/uuid"
-	api "github.com/lrmnt/AA6_homework/auth/api/proto"
-	"github.com/lrmnt/AA6_homework/auth/ent"
-	"github.com/lrmnt/AA6_homework/auth/ent/user"
 	"net/http"
 	"strconv"
 )
 
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := s.client.User.Query().
-		WithRole().
-		All(r.Context())
+	users, err := s.service.ListUsers(r.Context())
 	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, err)
+		s.s.Respond500(w, "can nol list users", err)
 		return
 	}
 
-	s.respondJSON(w, users)
+	s.s.RespondJSON(w, users)
 }
 
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "can not parse form", err)
 		return
 	}
 
 	name := r.Form.Get("name")
 	if name == "" {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "no name", nil)
 		return
 	}
 
 	roleID, err := strconv.ParseInt(r.Form.Get("role"), 10, 64)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "no valid role id", err)
 		return
 	}
 
-	var createdUser *ent.User
-	err = s.tx(r.Context(), func(tx *ent.Tx) error {
-		err := tx.User.Create().
-			SetName(name).
-			SetRoleID(int(roleID)).
-			Exec(r.Context())
-		if err != nil {
-			return fmt.Errorf("can not create user in DB: %w", err)
-		}
-
-		createdUser, err = tx.User.Query().
-			Where(user.Name(name)).
-			WithRole().
-			Only(r.Context())
-		if err != nil {
-			return fmt.Errorf("can not query user from DB: %w", err)
-		}
-
-		mes := &api.User{
-			Action:         api.Action_ACTION_CREATED,
-			PublicId:       createdUser.UUID.String(),
-			Name:           createdUser.Name,
-			Role:           createdUser.Edges.Role.Name,
-			IdempotencyKey: uuid.New().String(),
-		}
-
-		data, err := proto.Marshal(mes)
-		if err != nil {
-			return fmt.Errorf("can not marshal message: %w", err)
-		}
-
-		err = s.userProducer.Produce(data)
-		if err != nil {
-			return fmt.Errorf("can not produce message: %w", err)
-		}
-
-		return nil
-	})
-
+	createdUser, err := s.service.CreateUser(r.Context(), name, int(roleID))
 	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, err)
+		s.s.Respond500(w, "can not create user", err)
 		return
 	}
 
-	s.respondJSON(w, createdUser)
+	s.s.RespondJSON(w, createdUser)
 }
 
 func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "can not parse form", err)
 		return
 	}
 
 	name := r.Form.Get("name")
 	if name == "" {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "no name", nil)
 		return
 	}
 
 	userID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "no valid user id", err)
 		return
 	}
 
 	roleID, err := strconv.ParseInt(r.Form.Get("role_id"), 10, 64)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		s.s.Respond400(w, "no valid role id", err)
 		return
 	}
 
-	err = s.tx(r.Context(), func(tx *ent.Tx) error {
-		err := tx.User.Update().
-			Where(user.ID(int(userID))).
-			SetName(name).
-			SetRoleID(int(roleID)).
-			Exec(r.Context())
-		if err != nil {
-			return err
-		}
-
-		createdUser, err := tx.User.Query().
-			Where(user.Name(name)).
-			Only(r.Context())
-		if err != nil {
-			return err
-		}
-
-		mes := &api.User{
-			Action:         api.Action_ACTION_MODIFIED,
-			PublicId:       createdUser.UUID.String(),
-			Name:           createdUser.Name,
-			Role:           createdUser.Edges.Role.Name,
-			IdempotencyKey: uuid.New().String(),
-		}
-
-		data, err := proto.Marshal(mes)
-		if err != nil {
-			return err
-		}
-
-		err = s.userProducer.Produce(data)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	updatedUser, err := s.service.UpdateUser(r.Context(), name, int(roleID), int(userID))
 
 	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, err)
+		s.s.Respond500(w, "can not update user", err)
 		return
 	}
 
-	_, _ = w.Write([]byte("ok"))
+	s.s.RespondJSON(w, updatedUser)
 }

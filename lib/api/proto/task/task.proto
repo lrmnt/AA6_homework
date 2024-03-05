@@ -24,6 +24,6 @@ message Task {
   string title = 4;
   string description = 5;
   int64 cost = 6;
-  int64 user_id = 7;
+  string user_id = 7;
   string idempotency_key = 8;
 }

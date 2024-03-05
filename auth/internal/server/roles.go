@@ -1,40 +1,36 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
+)
 
 func (s *Server) listRoles(w http.ResponseWriter, r *http.Request) {
-	roles, err := s.client.Role.
-		Query().
-		All(r.Context())
+	roles, err := s.service.ListRoles(r.Context())
 	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, err)
+		s.s.Respond500(w, "can not list roles", err)
 		return
 	}
 
-	s.respondJSON(w, roles)
+	s.s.RespondJSON(w, roles)
 }
 
 func (s *Server) createRole(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, err)
+		s.s.Respond400(w, "can not parse form", err)
 		return
 	}
 
 	name := r.Form.Get("name")
 	if name == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		s.s.Respond400(w, "no name", nil)
 	}
 
-	role, err := s.client.Role.
-		Create().
-		SetName(name).
-		Save(r.Context())
+	role, err := s.service.CreateRole(r.Context(), name)
 	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, err)
+		s.s.Respond500(w, "can not create role", err)
 		return
 	}
 
-	s.respondJSON(w, role)
+	s.s.RespondJSON(w, role)
 }
