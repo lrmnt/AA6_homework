@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/lrmnt/AA6_homework/auth/api";
+
+enum Action {
+  ACTION_UNKNOWN = 0;
+  ACTION_CREATED = 1;
+  ACTION_MODIFIED = 2;
+}
+
+message User {
+  Action action = 1;
+  string public_id = 2;
+  string name = 3;
+  string role = 4;
+  string idempotency_key = 5;
+}
