@@ -5,8 +5,9 @@ import (
 	"errors"
 	_ "github.com/lib/pq"
 	"github.com/lrmnt/AA6_homework/auth/ent"
-	"github.com/lrmnt/AA6_homework/auth/internal/producer"
 	"github.com/lrmnt/AA6_homework/auth/internal/server"
+	service2 "github.com/lrmnt/AA6_homework/auth/internal/service"
+	"github.com/lrmnt/AA6_homework/lib/kafka"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
@@ -35,12 +36,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	userProducer, err := producer.New(ctx, "localhost:9092", "users")
+	userProducer, err := kafka.NewProducer(ctx, "localhost:9092", "users")
 	if err != nil {
 		l.Fatal("can not init kafka producer", zap.Error(err))
 	}
 
-	srv, err := server.New(client, "1234", ":8091", l, userProducer)
+	service := service2.New(l, client, userProducer)
+
+	srv, err := server.New("1234", ":8091", l, service)
 	if err != nil {
 		l.Fatal("can not init server", zap.Error(err))
 	}

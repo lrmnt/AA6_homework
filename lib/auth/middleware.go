@@ -1,17 +1,12 @@
-package server
+package auth
 
 import (
 	"context"
-	"encoding/json"
-	"github.com/lrmnt/AA6_homework/auth/pkg/model"
-	"io"
 	"net/http"
 	"strings"
 )
 
-func AuthMiddleware(addr string) func(http.Handler) http.Handler {
-	client := http.Client{}
-
+func (c *Client) AuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			parts := strings.Split(r.Header.Get("Authorization"), " ")
@@ -20,30 +15,10 @@ func AuthMiddleware(addr string) func(http.Handler) http.Handler {
 				return
 			}
 
-			req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, addr+"/validate?token="+parts[1], nil)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			resp, err := client.Do(req)
+			userInfo, err := c.validate(r.Context(), parts[1])
 			if err != nil {
 				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			data, err := io.ReadAll(resp.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			defer resp.Body.Close()
-
-			var userInfo model.UserInfo
-
-			err = json.Unmarshal(data, &userInfo)
-			if err != nil {
-				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(err.Error()))
 				return
 			}
 
@@ -54,12 +29,13 @@ func AuthMiddleware(addr string) func(http.Handler) http.Handler {
 	}
 }
 
-func VerifyMiddleware(roles ...string) func(http.Handler) http.Handler {
+func (c *Client) VerifyMiddleware(roles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user, ok := r.Context().Value(userCtxKey).(*model.UserInfo)
-			if !ok {
+			user, err := GetUserInfo(r.Context())
+			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(err.Error()))
 				return
 			}
 
@@ -73,4 +49,13 @@ func VerifyMiddleware(roles ...string) func(http.Handler) http.Handler {
 			w.WriteHeader(http.StatusForbidden)
 		})
 	}
+}
+
+func GetUserInfo(ctx context.Context) (*UserInfo, error) {
+	userInfo, ok := ctx.Value(userCtxKey).(*UserInfo)
+	if !ok {
+		return nil, ErrNoUserInfo
+	}
+
+	return userInfo, nil
 }

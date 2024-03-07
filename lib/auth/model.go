@@ -1,6 +1,13 @@
-package model
+package auth
 
-import "github.com/google/uuid"
+import (
+	"errors"
+	"github.com/google/uuid"
+)
+
+const userCtxKey = "user"
+
+var ErrNoUserInfo = errors.New("no user info")
 
 type UserInfo struct {
 	ID       int       `json:"id"`

@@ -1,4 +1,4 @@
-package producer
+package kafka
 
 import (
 	"context"
@@ -10,7 +10,7 @@ type Producer struct {
 	conn *kafka.Conn
 }
 
-func New(ctx context.Context, addr, topic string) (*Producer, error) {
+func NewProducer(ctx context.Context, addr, topic string) (*Producer, error) {
 	conn, err := kafka.DialLeader(ctx, "tcp", addr, topic, 0)
 	if err != nil {
 		return nil, err

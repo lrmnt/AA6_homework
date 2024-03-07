@@ -1,4 +1,4 @@
-package service
+package consumer
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	userApi "github.com/lrmnt/AA6_homework/auth/api/proto"
+	userApi "github.com/lrmnt/AA6_homework/lib/api/proto/user"
 	"github.com/lrmnt/AA6_homework/tasks/ent"
 	"github.com/lrmnt/AA6_homework/tasks/ent/user"
 	"github.com/lrmnt/AA6_homework/tasks/ent/userlog"
