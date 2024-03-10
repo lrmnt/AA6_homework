@@ -4,19 +4,19 @@ import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/lrmnt/AA6_homework/analytics/internal/service/reports"
 	"github.com/lrmnt/AA6_homework/lib/auth"
 	"github.com/lrmnt/AA6_homework/lib/http"
-	"github.com/lrmnt/AA6_homework/tasks/internal/service/tasks"
 	"go.uber.org/zap"
 )
 
 type Server struct {
 	s       *http.Server
 	log     *zap.Logger
-	service *tasks.Service
+	service *reports.Service
 }
 
-func New(authAddr, addr string, log *zap.Logger, service *tasks.Service) *Server {
+func New(authAddr, addr string, log *zap.Logger, service *reports.Service) *Server {
 	router := chi.NewMux()
 
 	s := &Server{
@@ -29,14 +29,13 @@ func New(authAddr, addr string, log *zap.Logger, service *tasks.Service) *Server
 
 	router.Use(middleware.Recoverer)
 
-	router.With(authClient.AuthMiddleware()).Group(func(r chi.Router) {
-		r.Get("/tasks", s.listTasksForUser)
-		r.Post("/tasks", s.createTask)
-		r.Post("/tasks/{id}", s.updateTaskStatus)
-
-		r.With(authClient.VerifyMiddleware("manager", "admin")).
-			Post("/reassign", s.reassignTasks)
-	})
+	router.With(authClient.AuthMiddleware()).
+		With(authClient.VerifyMiddleware("admin")).
+		Group(func(r chi.Router) {
+			r.Get("/last_day_sum", s.getLastDaySum)
+			r.Get("/last_day_debts", s.getLastDayPopugDebtsCount)
+			r.Get("/highest_price", s.getHighestPriceForPeriod)
+		})
 
 	return s
 }

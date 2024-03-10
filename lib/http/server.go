@@ -17,12 +17,13 @@ type errorResponse struct {
 	Message string `json:"message"`
 }
 
-func NewServer(addr string, router *chi.Mux) *Server {
+func NewServer(addr string, router *chi.Mux, log *zap.Logger) *Server {
 	return &Server{
 		Server: &http.Server{
 			Handler: router,
 			Addr:    addr,
 		},
+		log: log,
 	}
 }
 

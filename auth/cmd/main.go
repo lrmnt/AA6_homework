@@ -36,7 +36,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	userProducer, err := kafka.NewProducer(ctx, "localhost:9092", "users")
+	userProducer, err := kafka.NewProducer(ctx, "localhost:9092", "users_stream_v1")
 	if err != nil {
 		l.Fatal("can not init kafka producer", zap.Error(err))
 	}

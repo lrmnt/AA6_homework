@@ -25,7 +25,7 @@ func New(
 	router := chi.NewMux()
 
 	s := &Server{
-		s:         http.NewServer(addr, router),
+		s:         http.NewServer(addr, router, log),
 		jwtSecret: jwtSecret,
 		service:   service,
 		log:       log,
