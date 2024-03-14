@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	userApi "github.com/lrmnt/AA6_homework/lib/api/proto/user"
+	userApi "github.com/lrmnt/AA6_homework/lib/api/schema/user"
 	"github.com/lrmnt/AA6_homework/tasks/ent"
 	"github.com/lrmnt/AA6_homework/tasks/ent/user"
 	"github.com/lrmnt/AA6_homework/tasks/ent/userlog"
@@ -15,27 +15,32 @@ import (
 )
 
 type Service struct {
-	log          *zap.Logger
-	client       *ent.Client
-	userConsumer *kafka.Reader
+	log                  *zap.Logger
+	client               *ent.Client
+	userConsumerV0       *kafka.Reader
+	userStreamV1Consumer *kafka.Reader
 }
 
-func New(l *zap.Logger, client *ent.Client, userConsumer *kafka.Reader) *Service {
+func New(l *zap.Logger, client *ent.Client,
+	userConsumer *kafka.Reader,
+	userStreamV1Consumer *kafka.Reader,
+) *Service {
 	return &Service{
-		log:          l,
-		client:       client,
-		userConsumer: userConsumer,
+		log:                  l,
+		client:               client,
+		userConsumerV0:       userConsumer,
+		userStreamV1Consumer: userStreamV1Consumer,
 	}
 }
 
-func (s *Service) Run(ctx context.Context) {
+func (s *Service) RunUserV0Consumer(ctx context.Context) {
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				mes, err := s.userConsumer.FetchMessage(ctx)
+				mes, err := s.userConsumerV0.FetchMessage(ctx)
 				if err != nil {
 					s.log.Error("can not read message from queue", zap.Error(err))
 					continue
@@ -49,13 +54,13 @@ func (s *Service) Run(ctx context.Context) {
 					continue
 				}
 
-				err = s.processUserMessage(ctx, &userMessage)
+				err = s.processUserV0Message(ctx, &userMessage)
 				if err != nil {
 					s.log.Error("can not process user message", zap.Error(err))
 					continue
 				}
 
-				err = s.userConsumer.CommitMessages(ctx, mes)
+				err = s.userConsumerV0.CommitMessages(ctx, mes)
 				if err != nil {
 					s.log.Error("can not commit user message", zap.Error(err))
 				}
@@ -65,7 +70,7 @@ func (s *Service) Run(ctx context.Context) {
 	}()
 }
 
-func (s *Service) processUserMessage(ctx context.Context, userMessage *userApi.User) error {
+func (s *Service) processUserV0Message(ctx context.Context, userMessage *userApi.User) error {
 	publicID, err := uuid.Parse(userMessage.PublicId)
 	if err != nil {
 		return fmt.Errorf("can not parse public id: %w", err)

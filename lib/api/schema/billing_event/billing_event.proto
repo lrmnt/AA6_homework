@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option go_package = "github.com/lrmnt/AA6_homework/lib/api/billing_event";
+package billing_event;
+
+enum Event {
+  EVENT_UNKNOWN = 0;
+  EVENT_PAYED_TO_USER = 1;
+  EVENT_USER_BALANCE_BELOW_ZERO_AT_THE_END_OF_DAY = 2;
+}
+
+message BillingEventV1 {
+  Event event = 1;
+  int64 timestamp = 2;
+  string event_id = 3;
+  string user_id = 4;
+  int64 amount = 5;
+}

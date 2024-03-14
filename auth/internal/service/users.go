@@ -7,7 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/lrmnt/AA6_homework/auth/ent"
 	"github.com/lrmnt/AA6_homework/auth/ent/user"
-	api "github.com/lrmnt/AA6_homework/lib/api/proto/user"
+	"github.com/lrmnt/AA6_homework/lib/api/schema"
+	"github.com/lrmnt/AA6_homework/lib/api/schema/user_stream"
+	"time"
 )
 
 func (s *Service) ListUsers(ctx context.Context) ([]*ent.User, error) {
@@ -43,12 +45,18 @@ func (s *Service) CreateUser(ctx context.Context, name string, roleID int) (*ent
 			return fmt.Errorf("can not query user from DB: %w", err)
 		}
 
-		mes := &api.User{
-			Action:         api.Action_ACTION_CREATED,
+		mes := &user_stream.UserStreamV1{
+			Action:         user_stream.Action_ACTION_CREATED,
 			PublicId:       createdUser.UUID.String(),
 			Name:           createdUser.Name,
 			Role:           createdUser.Edges.Role.Name,
 			IdempotencyKey: uuid.New().String(),
+			Timestamp:      time.Now().UnixNano(),
+		}
+
+		_, err = schema.ValidateUserStreamV1(mes)
+		if err != nil {
+			return err
 		}
 
 		data, err := proto.Marshal(mes)
@@ -87,12 +95,18 @@ func (s *Service) UpdateUser(ctx context.Context, name string, roleID, userID in
 			return err
 		}
 
-		mes := &api.User{
-			Action:         api.Action_ACTION_MODIFIED,
+		mes := &user_stream.UserStreamV1{
+			Action:         user_stream.Action_ACTION_MODIFIED,
 			PublicId:       updatedUser.UUID.String(),
 			Name:           updatedUser.Name,
 			Role:           updatedUser.Edges.Role.Name,
 			IdempotencyKey: uuid.New().String(),
+			Timestamp:      time.Now().UnixNano(),
+		}
+
+		_, err = schema.ValidateUserStreamV1(mes)
+		if err != nil {
+			return err
 		}
 
 		data, err := proto.Marshal(mes)

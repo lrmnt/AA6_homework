@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	api "github.com/lrmnt/AA6_homework/lib/api/proto/task"
+	"github.com/lrmnt/AA6_homework/lib/api/schema"
+	"github.com/lrmnt/AA6_homework/lib/api/schema/task_event"
+	"github.com/lrmnt/AA6_homework/lib/api/schema/task_stream"
 	"github.com/lrmnt/AA6_homework/lib/kafka"
 	"github.com/lrmnt/AA6_homework/tasks/ent"
 	"github.com/lrmnt/AA6_homework/tasks/ent/task"
 	"github.com/lrmnt/AA6_homework/tasks/ent/user"
 	"go.uber.org/zap"
 	"math/rand"
+	"time"
 )
 
 var (
@@ -20,13 +23,24 @@ var (
 )
 
 type Service struct {
-	log           *zap.Logger
-	client        *ent.Client
-	tasksProducer *kafka.Producer
+	log                 *zap.Logger
+	client              *ent.Client
+	tasksStreamProducer *kafka.Producer
+	tasksEventProducer  *kafka.Producer
 }
 
-func New(log *zap.Logger, client *ent.Client, tasksProducer *kafka.Producer) *Service {
-	return &Service{log: log, client: client, tasksProducer: tasksProducer}
+func New(
+	log *zap.Logger,
+	client *ent.Client,
+	tasksStreamProducer *kafka.Producer,
+	tasksEvenProducer *kafka.Producer,
+) *Service {
+	return &Service{
+		log:                 log,
+		client:              client,
+		tasksStreamProducer: tasksStreamProducer,
+		tasksEventProducer:  tasksEvenProducer,
+	}
 }
 
 func (s *Service) tx(ctx context.Context, fn func(tx *ent.Tx) error) error {
@@ -61,17 +75,17 @@ func (s *Service) ListTasksForUser(ctx context.Context, id uuid.UUID) ([]*ent.Ta
 		All(ctx)
 }
 
-func statusFromString(s string) (api.Status, error) {
+func statusFromString(s string) (task_stream.Status, error) {
 	switch s {
 	case "done":
-		return api.Status_STATUS_DONE, nil
+		return task_stream.Status_STATUS_DONE, nil
 	case "in_progress":
-		return api.Status_STATUS_IN_PROGRESS, nil
+		return task_stream.Status_STATUS_IN_PROGRESS, nil
 	case "todo":
-		return api.Status_STATUS_TODO, nil
+		return task_stream.Status_STATUS_TODO, nil
 	}
 
-	return api.Status_STATUS_UNKNOWN, errors.New("unknown status")
+	return task_stream.Status_STATUS_UNKNOWN, errors.New("unknown status")
 }
 
 func getRandomUser(ctx context.Context, tx *ent.Tx) (*ent.User, error) {
@@ -110,8 +124,8 @@ func (s *Service) CreateTask(ctx context.Context, title, description string) (*e
 			return err
 		}
 
-		mes := &api.Task{
-			Action:         api.Action_ACTION_CREATED,
+		mes := &task_stream.TaskStreamV1{
+			Action:         task_stream.Action_ACTION_CREATED,
 			Status:         status,
 			PublicId:       createdTask.UUID.String(),
 			Title:          createdTask.Title,
@@ -119,6 +133,12 @@ func (s *Service) CreateTask(ctx context.Context, title, description string) (*e
 			Cost:           createdTask.Price,
 			UserId:         randomUser.UUID.String(),
 			IdempotencyKey: uuid.New().String(),
+			Timestamp:      time.Now().UnixNano(),
+		}
+
+		_, err = schema.ValidateTaskStreamV1(mes)
+		if err != nil {
+			return err
 		}
 
 		data, err := proto.Marshal(mes)
@@ -126,7 +146,7 @@ func (s *Service) CreateTask(ctx context.Context, title, description string) (*e
 			return err
 		}
 
-		if err = s.tasksProducer.Produce(data); err != nil {
+		if err = s.tasksStreamProducer.Produce(data); err != nil {
 			return err
 		}
 
@@ -163,24 +183,28 @@ func (s *Service) UpdateTaskStatus(ctx context.Context, taskID int, userID uuid.
 			return err
 		}
 
-		mes := &api.Task{
-			Action:         api.Action_ACTION_MODIFIED,
-			Status:         apiStatus,
-			PublicId:       updatedTask.UUID.String(),
-			Title:          updatedTask.Title,
-			Description:    updatedTask.Description,
-			Cost:           updatedTask.Price,
-			UserId:         userID.String(),
-			IdempotencyKey: uuid.New().String(),
-		}
+		if apiStatus == task_stream.Status_STATUS_DONE {
+			mes := &task_event.TaskEventV1{
+				Event:          task_event.Event_EVENT_DONE,
+				Timestamp:      time.Now().UnixNano(),
+				EventId:        uuid.New().String(),
+				AssigneeUserId: userID.String(),
+				TaskId:         updatedTask.UUID.String(),
+			}
 
-		data, err := proto.Marshal(mes)
-		if err != nil {
-			return err
-		}
+			_, err = schema.ValidateTaskEventV1(mes)
+			if err != nil {
+				return err
+			}
 
-		if err = s.tasksProducer.Produce(data); err != nil {
-			return err
+			data, err := proto.Marshal(mes)
+			if err != nil {
+				return err
+			}
+
+			if err = s.tasksEventProducer.Produce(data); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -225,11 +249,6 @@ func (s *Service) reassignTaskRandomly(ctx context.Context, taskID int) error {
 			return nil
 		}
 
-		status, err := statusFromString(loadedTask.Status.String())
-		if err != nil {
-			return err
-		}
-
 		// selecting random user inside of transaction to be sure that user exists and have correct role
 		randomUser, err := getRandomUser(ctx, tx)
 		if err != nil {
@@ -244,15 +263,17 @@ func (s *Service) reassignTaskRandomly(ctx context.Context, taskID int) error {
 				return err
 			}
 
-			mes := &api.Task{
-				Action:         api.Action_ACTION_REASSIGNED,
-				Status:         status,
-				PublicId:       loadedTask.UUID.String(),
-				Title:          loadedTask.Title,
-				Description:    loadedTask.Description,
-				Cost:           loadedTask.Price,
-				UserId:         randomUser.UUID.String(),
-				IdempotencyKey: uuid.New().String(),
+			mes := &task_event.TaskEventV1{
+				Event:          task_event.Event_EVENT_DONE,
+				Timestamp:      time.Now().UnixNano(),
+				EventId:        uuid.New().String(),
+				AssigneeUserId: randomUser.UUID.String(),
+				TaskId:         loadedTask.UUID.String(),
+			}
+
+			_, err = schema.ValidateTaskEventV1(mes)
+			if err != nil {
+				return err
 			}
 
 			data, err := proto.Marshal(mes)
@@ -260,8 +281,7 @@ func (s *Service) reassignTaskRandomly(ctx context.Context, taskID int) error {
 				return err
 			}
 
-			err = s.tasksProducer.Produce(data)
-			if err != nil {
+			if err = s.tasksEventProducer.Produce(data); err != nil {
 				return err
 			}
 		}

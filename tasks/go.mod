@@ -4,8 +4,6 @@ go 1.22
 
 toolchain go1.22.0
 
-replace github.com/lrmnt/AA6_homework/auth => ../auth // do not load from github
-
 replace github.com/lrmnt/AA6_homework/lib => ../lib // do not load from github
 
 require (

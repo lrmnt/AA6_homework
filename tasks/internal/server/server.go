@@ -20,7 +20,7 @@ func New(authAddr, addr string, log *zap.Logger, service *tasks.Service) *Server
 	router := chi.NewMux()
 
 	s := &Server{
-		s:       http.NewServer(addr, router),
+		s:       http.NewServer(addr, router, log),
 		log:     log,
 		service: service,
 	}

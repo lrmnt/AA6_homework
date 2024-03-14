@@ -22,7 +22,7 @@ func (c *Client) AuthMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			r = r.WithContext(context.WithValue(r.Context(), userCtxKey, &userInfo))
+			r = r.WithContext(context.WithValue(r.Context(), userCtxKey, userInfo))
 
 			next.ServeHTTP(w, r)
 		})
