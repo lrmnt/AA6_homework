@@ -48,10 +48,15 @@ func (s *Service) RunConsumeTaskEventV1(ctx context.Context) error {
 				continue
 			}
 
-			err = s.processTaskEventV1(ctx, &taskEvent)
-			if err != nil {
-				s.log.Error("can not process task event", zap.Error(err))
-				continue
+			for i := 0; ; i++ {
+				err = s.processTaskEventV1(ctx, &taskEvent)
+				if err != nil {
+					s.log.Warn("can not process task event", zap.Error(err), zap.Int("attempt", i+1))
+					time.Sleep(retryTimeout * time.Duration(1<<i))
+					continue
+				}
+
+				break
 			}
 
 			err = s.taskEventV1Consumer.CommitMessages(ctx, mes)
@@ -59,6 +64,7 @@ func (s *Service) RunConsumeTaskEventV1(ctx context.Context) error {
 				s.log.Error("can not commit task event", zap.Error(err))
 			}
 
+			s.log.Debug("processed task event")
 		}
 	}
 }

@@ -35,12 +35,12 @@ func (s *Server) getHighestPriceForPeriod(w http.ResponseWriter, r *http.Request
 
 	from := r.Form.Get("from")
 	to := r.Form.Get("to")
-	fromTime, err := time.Parse("2006-02-01", from)
+	fromTime, err := time.Parse("2006-01-02", from)
 	if err != nil {
 		s.s.Respond400(w, "can not parse from time", err)
 		return
 	}
-	toTime, err := time.Parse("2006-02-01", to)
+	toTime, err := time.Parse("2006-01-02", to)
 	if err != nil {
 		s.s.Respond400(w, "can not parse to time", err)
 		return

@@ -17,13 +17,13 @@ func GetCurrentBillingCycle(ctx context.Context, tx *ent.Tx) (*ent.BillingCycle,
 	fromStartOfDay += time.Second * time.Duration(curTime.Second())
 	fromStartOfDay += time.Nanosecond * time.Duration(curTime.Nanosecond())
 
-	tsTo := curTime.Add(-fromStartOfDay).UnixNano()
-	tsFrom := curTime.Add(-fromStartOfDay).Add(-time.Hour * 24).UnixNano()
+	tsFrom := curTime.Add(-fromStartOfDay).UnixNano()
+	tsTo := curTime.Add(-fromStartOfDay).Add(time.Hour * 24).UnixNano()
 
 	bc, err := tx.BillingCycle.Query().
 		Where(billingcycle.And(
-			billingcycle.TsToLT(tsTo),
-			billingcycle.TsFromLTE(tsFrom),
+			billingcycle.TsTo(tsTo),
+			billingcycle.TsFrom(tsFrom),
 		)).
 		Only(ctx)
 

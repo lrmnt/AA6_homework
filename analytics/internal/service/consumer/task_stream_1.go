@@ -39,7 +39,7 @@ func (s *Service) RunConsumeTaskMessageV1(ctx context.Context) error {
 			if err != nil || !ok { // invalid message format
 				s.log.Warn("can not validate user stream v1 message")
 
-				err = s.userStreamV0Consumer.CommitMessages(ctx, mes)
+				err = s.userStreamV1Consumer.CommitMessages(ctx, mes)
 				if err != nil {
 					s.log.Error("can not commit user message", zap.Error(err))
 				}

@@ -25,15 +25,15 @@ var (
 type Service struct {
 	log                 *zap.Logger
 	client              *ent.Client
-	tasksStreamProducer *kafka.Producer
-	tasksEventProducer  *kafka.Producer
+	tasksStreamProducer *kafka.SaramaProducer
+	tasksEventProducer  *kafka.SaramaProducer
 }
 
 func New(
 	log *zap.Logger,
 	client *ent.Client,
-	tasksStreamProducer *kafka.Producer,
-	tasksEvenProducer *kafka.Producer,
+	tasksStreamProducer *kafka.SaramaProducer,
+	tasksEvenProducer *kafka.SaramaProducer,
 ) *Service {
 	return &Service{
 		log:                 log,
@@ -105,7 +105,7 @@ func (s *Service) CreateTask(ctx context.Context, title, description string) (*e
 	err := s.tx(ctx, func(tx *ent.Tx) error {
 		randomUser, err := getRandomUser(ctx, tx)
 		if err != nil {
-			return err
+			return fmt.Errorf("can not get user to assign: %w", err)
 		}
 
 		createdTask, err = tx.Task.Create().
@@ -138,16 +138,20 @@ func (s *Service) CreateTask(ctx context.Context, title, description string) (*e
 
 		_, err = schema.ValidateTaskStreamV1(mes)
 		if err != nil {
-			return err
+			return fmt.Errorf("can not validate message: %w", err)
 		}
 
 		data, err := proto.Marshal(mes)
 		if err != nil {
-			return err
+			return fmt.Errorf("can not marshal message: %w", err)
 		}
 
-		if err = s.tasksStreamProducer.Produce(data); err != nil {
-			return err
+		if err = s.tasksStreamProducer.Send(data); err != nil {
+			return fmt.Errorf("can not produce stream message: %w", err)
+		}
+
+		if err = s.produceTaskEvent(task_event.Event_EVENT_REASSIGNED, randomUser.UUID, createdTask.UUID); err != nil {
+			return fmt.Errorf("can not produce event message: %w", err)
 		}
 
 		return nil
@@ -184,25 +188,7 @@ func (s *Service) UpdateTaskStatus(ctx context.Context, taskID int, userID uuid.
 		}
 
 		if apiStatus == task_stream.Status_STATUS_DONE {
-			mes := &task_event.TaskEventV1{
-				Event:          task_event.Event_EVENT_DONE,
-				Timestamp:      time.Now().UnixNano(),
-				EventId:        uuid.New().String(),
-				AssigneeUserId: userID.String(),
-				TaskId:         updatedTask.UUID.String(),
-			}
-
-			_, err = schema.ValidateTaskEventV1(mes)
-			if err != nil {
-				return err
-			}
-
-			data, err := proto.Marshal(mes)
-			if err != nil {
-				return err
-			}
-
-			if err = s.tasksEventProducer.Produce(data); err != nil {
+			if err = s.produceTaskEvent(task_event.Event_EVENT_DONE, userID, updatedTask.UUID); err != nil {
 				return err
 			}
 		}
@@ -263,29 +249,33 @@ func (s *Service) reassignTaskRandomly(ctx context.Context, taskID int) error {
 				return err
 			}
 
-			mes := &task_event.TaskEventV1{
-				Event:          task_event.Event_EVENT_DONE,
-				Timestamp:      time.Now().UnixNano(),
-				EventId:        uuid.New().String(),
-				AssigneeUserId: randomUser.UUID.String(),
-				TaskId:         loadedTask.UUID.String(),
-			}
-
-			_, err = schema.ValidateTaskEventV1(mes)
-			if err != nil {
-				return err
-			}
-
-			data, err := proto.Marshal(mes)
-			if err != nil {
-				return err
-			}
-
-			if err = s.tasksEventProducer.Produce(data); err != nil {
+			if err = s.produceTaskEvent(task_event.Event_EVENT_REASSIGNED, randomUser.UUID, loadedTask.UUID); err != nil {
 				return err
 			}
 		}
 
 		return nil
 	})
+}
+
+func (s *Service) produceTaskEvent(event task_event.Event, userID, taskID uuid.UUID) error {
+	mes := &task_event.TaskEventV1{
+		Event:          event,
+		Timestamp:      time.Now().UnixNano(),
+		EventId:        uuid.New().String(),
+		AssigneeUserId: userID.String(),
+		TaskId:         taskID.String(),
+	}
+
+	_, err := schema.ValidateTaskEventV1(mes)
+	if err != nil {
+		return err
+	}
+
+	data, err := proto.Marshal(mes)
+	if err != nil {
+		return err
+	}
+
+	return s.tasksEventProducer.Send(data)
 }
