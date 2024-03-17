@@ -37,22 +37,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tasksStreamProducer, err := kafka.NewProducer(ctx, "localhost:9092", "tasks_stream_v1")
-	if err != nil {
-		l.Fatal("can not init kafka producer", zap.Error(err))
-	}
-	tasksEventProducer, err := kafka.NewProducer(ctx, "localhost:9092", "tasks_event_v1")
-	if err != nil {
-		l.Fatal("can not init kafka producer", zap.Error(err))
-	}
+	tasksStreamProducer := kafka.NewSaramaProducer("localhost:9092", "tasks_stream_v1")
+	tasksEventProducer := kafka.NewSaramaProducer("localhost:9092", "tasks_event_v1")
 
 	service := tasks.New(l, client, tasksStreamProducer, tasksEventProducer)
 
 	srv := server.New("http://localhost:8091", ":8092", l, service)
 
-	userConsumerV0 := kafka.NewReader([]string{"localhost:9092"}, "users", "tasks")
 	userStreamConsumerV1 := kafka.NewReader([]string{"localhost:9092"}, "users_stream_v1", "tasks")
-	loader := consumer.New(l, client, userConsumerV0, userStreamConsumerV1)
+	loader := consumer.New(l, client, userStreamConsumerV1)
 
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -70,14 +63,6 @@ func main() {
 	})
 
 	// run load users
-	eg.Go(func() error {
-		loader.RunUserV0Consumer(ctx)
-
-		l.Debug("kafka loader stopped")
-
-		return nil
-	})
-
 	eg.Go(func() error {
 		err := loader.RunConsumeUserMessageV1(ctx)
 
@@ -109,4 +94,7 @@ func main() {
 
 	cancel()
 	_ = eg.Wait()
+
+	tasksStreamProducer.Close()
+	tasksEventProducer.Close()
 }

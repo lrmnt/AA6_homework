@@ -1,6 +1,10 @@
 package kafka
 
-import "github.com/segmentio/kafka-go"
+import (
+	"github.com/IBM/sarama"
+	"github.com/segmentio/kafka-go"
+	"log"
+)
 
 func NewReader(brokers []string, topic, group string) *kafka.Reader {
 	r := kafka.NewReader(kafka.ReaderConfig{
@@ -11,4 +15,16 @@ func NewReader(brokers []string, topic, group string) *kafka.Reader {
 	})
 
 	return r
+}
+
+func NewSaramaReader(brokers []string, group string) sarama.ConsumerGroup {
+	conf := sarama.NewConfig()
+	conf.Consumer.Return.Errors = true
+
+	cg, err := sarama.NewConsumerGroup(brokers, group, conf)
+	if err != nil {
+		log.Fatalf("can not create consumer group: %w", err)
+	}
+
+	return cg
 }

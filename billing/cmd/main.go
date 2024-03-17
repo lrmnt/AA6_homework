@@ -43,13 +43,10 @@ func main() {
 
 	srv := server.New("http://localhost:8091", ":8093", l, reportService)
 
-	userConsumerV0 := kafka.NewReader([]string{"localhost:9092"}, "users", "billing")
 	userConsumerV1 := kafka.NewReader([]string{"localhost:9092"}, "users_stream_v1", "billing")
-	taskConsumerV0 := kafka.NewReader([]string{"localhost:9092"}, "tasks", "billing")
 	taskConsumerV1 := kafka.NewReader([]string{"localhost:9092"}, "tasks_stream_v1", "billing")
 	taskEventConsumerV1 := kafka.NewReader([]string{"localhost:9092"}, "tasks_event_v1", "billing")
-	loader := consumer.New(l, client,
-		userConsumerV0, userConsumerV1, taskConsumerV0, taskConsumerV1, taskEventConsumerV1)
+	loader := consumer.New(l, client, userConsumerV1, taskConsumerV1, taskEventConsumerV1)
 
 	billingProducer, err := kafka.NewProducer(ctx, "localhost:9092", "billing_events_v1")
 	if err != nil {
@@ -75,22 +72,12 @@ func main() {
 
 	// run load users
 	eg.Go(func() error {
-		err := loader.RunConsumeTaskMessageV0(ctx)
-		l.Debug("kafka loader stopped")
-		return err
-	})
-	eg.Go(func() error {
 		err := loader.RunConsumeTaskMessageV1(ctx)
 		l.Debug("kafka loader stopped")
 		return err
 	})
 	eg.Go(func() error {
 		err := loader.RunConsumeTaskEventV1(ctx)
-		l.Debug("kafka loader stopped")
-		return err
-	})
-	eg.Go(func() error {
-		err := loader.RunConsumeUserMessageV0(ctx)
 		l.Debug("kafka loader stopped")
 		return err
 	})
